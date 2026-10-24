@@ -7,7 +7,9 @@ import { ALL_LOCAL_VENDORS } from '@/lib/anantapur-vendors';
 
 async function getVendorBySlug(slug: string) {
   try {
-    const res = await fetch(`http://localhost:4000/api/vendors/${slug}`, {
+    const apiBase = process.env.API_SERVICE_URL || process.env.API_URL || 'http://localhost:4000';
+    const targetUrl = new URL(`/api/vendors/${slug}`, apiBase);
+    const res = await fetch(targetUrl.toString(), {
       cache: 'no-store',
     });
     if (res.ok) {

@@ -1,0 +1,367 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+enum Role {
+  ADMIN
+  CUSTOMER
+}
+
+enum VerificationLevel {
+  VERIFIED
+  PREMIUM
+  FEATURED
+}
+
+enum VendorStatus {
+  PUBLISHED
+  DRAFT
+  UNPUBLISHED
+}
+
+enum QuoteStatus {
+  PENDING
+  CONTACTED
+  QUOTED
+  CLOSED
+}
+
+enum ReviewStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String?       @unique
+  phone        String?       @unique
+  name         String
+  passwordHash String?
+  role         Role          @default(CUSTOMER)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  events       Event[]
+  shortlists   Shortlist[]
+  reviews      VendorReview[]
+  quoteRequests QuoteRequest[]
+}
+
+model Location {
+  id          String   @id @default(uuid())
+  country     String   @default("India")
+  state       String   @default("Andhra Pradesh")
+  district    String   @default("Anantapur")
+  city        String   @default("Anantapur")
+  citySlug    String   @default("anantapur")
+  area        String?
+  pincode     String?
+  isPopular   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vendors     Vendor[]
+
+  @@index([citySlug])
+  @@index([city])
+  @@index([state])
+}
+
+model EventCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  icon        String?
+  description String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model VendorCategory {
+  id            String             @id @default(uuid())
+  name          String             @unique
+  slug          String             @unique
+  icon          String?
+  description   String?
+  sortOrder     Int                @default(0)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  subcategories VendorSubcategory[]
+  vendors       Vendor[]
+}
+
+model VendorSubcategory {
+  id         String         @id @default(uuid())
+  name       String
+  slug       String         @unique
+  categoryId String
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  category   VendorCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+model Vendor {
+  id               String            @id @default(uuid())
+  businessName     String
+  slug             String            @unique
+  categoryId       String
+  description      String
+  shortDescription String
+  locationId       String?
+  city             String            @default("Anantapur")
+  state            String            @default("Andhra Pradesh")
+  address          String
+  latitude         Float?
+  longitude        Float?
+  phone            String?
+  email            String?
+  website          String?
+  instagram        String?
+  startingPrice    Float
+  rating           Float             @default(5.0)
+  reviewCount      Int               @default(0)
+  verified         Boolean           @default(true)
+  verifiedLevel    VerificationLevel @default(VERIFIED)
+  featured         Boolean           @default(false)
+  status           VendorStatus      @default(PUBLISHED)
+  coverImage       String?
+  logoImage        String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  category         VendorCategory    @relation(fields: [categoryId], references: [id])
+  location         Location?         @relation(fields: [locationId], references: [id])
+  services         VendorService[]
+  packages         VendorPackage[]
+  portfolios       VendorPortfolio[]
+  reviews          VendorReview[]
+  quoteRequests    QuoteRequest[]
+  shortlists       Shortlist[]
+  bookings         Booking[]
+
+  @@index([city])
+  @@index([categoryId])
+  @@index([status])
+  @@index([verified])
+  @@index([featured])
+  @@index([startingPrice])
+  @@index([rating])
+}
+
+model VendorService {
+  id          String   @id @default(uuid())
+  vendorId    String
+  name        String
+  description String?
+  price       Float?
+  unit        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+}
+
+model VendorPackage {
+  id           String   @id @default(uuid())
+  vendorId     String
+  name         String
+  description  String?
+  price        Float
+  duration     String?
+  staffCount   Int?
+  deliverables String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vendor       Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+}
+
+model VendorPortfolio {
+  id        String   @id @default(uuid())
+  vendorId  String
+  title     String?
+  imageUrl  String
+  caption   String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+}
+
+model VendorReview {
+  id               String       @id @default(uuid())
+  vendorId         String
+  userId           String?
+  rating           Float
+  reviewerName     String
+  reviewText       String
+  verifiedPurchase Boolean      @default(false)
+  status           ReviewStatus @default(APPROVED)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  vendor           Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  user             User?        @relation(fields: [userId], references: [id])
+}
+
+model Event {
+  id            String       @id @default(uuid())
+  userId        String?
+  eventCategory String
+  title         String
+  city          String       @default("Anantapur")
+  eventDate     DateTime
+  guestCount    Int
+  budget        Float
+  status        String       @default("PLANNING")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  user          User?        @relation(fields: [userId], references: [id])
+  tasks         EventTask[]
+  budgetTracker EventBudget?
+  bookings      Booking[]
+}
+
+model EventTask {
+  id           String   @id @default(uuid())
+  eventId      String
+  categoryName String?
+  title        String
+  completed    Boolean  @default(false)
+  dueDate      DateTime?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model EventBudget {
+  id              String            @id @default(uuid())
+  eventId         String            @unique
+  totalBudget     Float
+  allocatedBudget Float             @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  event           Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  items           EventBudgetItem[]
+}
+
+model EventBudgetItem {
+  id              String      @id @default(uuid())
+  eventBudgetId   String
+  categoryName    String
+  allocatedAmount Float
+  spentAmount     Float       @default(0)
+  percentage      Float
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  eventBudget     EventBudget @relation(fields: [eventBudgetId], references: [id], onDelete: Cascade)
+}
+
+model QuoteRequest {
+  id               String      @id @default(uuid())
+  vendorId         String
+  userId           String?
+  name             String
+  phone            String
+  email            String
+  eventType        String
+  eventDate        DateTime
+  city             String      @default("Anantapur")
+  guestCount       Int
+  budget           Float?
+  servicesRequired String
+  notes            String?
+  status           QuoteStatus @default(PENDING)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  vendor           Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  user             User?       @relation(fields: [userId], references: [id])
+}
+
+model Shortlist {
+  id        String   @id @default(uuid())
+  userId    String
+  vendorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vendorId])
+}
+
+model InspirationCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  icon      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inspirations Inspiration[]
+}
+
+model Inspiration {
+  id                  String               @id @default(uuid())
+  title               String
+  slug                String               @unique
+  imageUrl            String
+  categoryId          String
+  estimatedBudgetMin  Float?
+  estimatedBudgetMax  Float?
+  location            String               @default("Anantapur")
+  eventType           String               @default("Wedding")
+  description         String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  category            InspirationCategory  @relation(fields: [categoryId], references: [id])
+}
+
+model Booking {
+  id        String   @id @default(uuid())
+  eventId   String
+  vendorId  String
+  userId    String
+  amount    Float
+  status    String   @default("CONFIRMED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event     Event    @relation(fields: [eventId], references: [id])
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+  payments  Payment[]
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  bookingId     String
+  transactionId String?
+  amount        Float
+  gateway       String   @default("RAZORPAY")
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  booking       Booking  @relation(fields: [bookingId], references: [id])
+}

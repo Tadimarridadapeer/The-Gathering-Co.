@@ -5,7 +5,9 @@ import { getVendorsByCity } from '@/lib/anantapur-vendors';
 
 async function getFeaturedVendors(city: string = 'Anantapur') {
   try {
-    const res = await fetch(`http://localhost:4000/api/vendors?city=${encodeURIComponent(city)}&limit=4`, {
+    const apiBase = process.env.API_SERVICE_URL || process.env.API_URL || 'http://localhost:4000';
+    const targetUrl = new URL(`/api/vendors?city=${encodeURIComponent(city)}&limit=4`, apiBase);
+    const res = await fetch(targetUrl.toString(), {
       cache: 'no-store',
     });
     if (res.ok) {

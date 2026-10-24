@@ -1,8 +1,20 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+export function getApiBaseUrl(): string {
+  if (typeof window === 'undefined') {
+    // Server runtime (Vercel Service Binding or environment URL)
+    return process.env.API_SERVICE_URL || process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  }
+  // Browser client runtime: relative to current origin on production, or port 4000 on localhost
+  return process.env.NEXT_PUBLIC_API_URL ?? (window.location.hostname === 'localhost' && window.location.port === '3000' ? 'http://localhost:4000' : '');
+}
 
 export async function fetchFromApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
   try {
-    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const base = getApiBaseUrl();
+    const formattedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const apiPath = formattedEndpoint.startsWith('/api') ? formattedEndpoint : `/api${formattedEndpoint}`;
+    const url = base ? new URL(apiPath, base).toString() : apiPath;
+
+    const res = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',

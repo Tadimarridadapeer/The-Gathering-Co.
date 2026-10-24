@@ -30,7 +30,8 @@ export const FeaturedVendorsSection: React.FC<FeaturedVendorsSectionProps> = ({
     async function fetchVendorsForCity(city: string) {
       setLoading(true);
       try {
-        const res = await fetch(`http://localhost:4000/api/vendors?city=${encodeURIComponent(city)}&limit=4`, {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL ?? (typeof window !== 'undefined' && window.location.hostname === 'localhost' && window.location.port === '3000' ? 'http://localhost:4000' : '');
+        const res = await fetch(`${apiBase}/api/vendors?city=${encodeURIComponent(city)}&limit=4`, {
           cache: 'no-store',
         });
         if (res.ok) {

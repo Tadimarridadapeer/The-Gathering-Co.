@@ -229,7 +229,8 @@ export default function AdminDashboardPage() {
     };
 
     try {
-      await fetch('http://localhost:4000/api/vendors/admin', {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? (typeof window !== 'undefined' && window.location.hostname === 'localhost' && window.location.port === '3001' ? 'http://localhost:4000' : '');
+      await fetch(`${apiBase}/api/vendors/admin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

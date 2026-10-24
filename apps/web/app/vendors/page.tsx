@@ -20,7 +20,9 @@ async function getVendors(searchParams: { [key: string]: string | undefined }) {
       ...(verifiedOnly && { verifiedOnly: 'true' }),
     });
 
-    const res = await fetch(`http://localhost:4000/api/vendors?${query.toString()}`, {
+    const apiBase = process.env.API_SERVICE_URL || process.env.API_URL || 'http://localhost:4000';
+    const targetUrl = new URL(`/api/vendors?${query.toString()}`, apiBase);
+    const res = await fetch(targetUrl.toString(), {
       cache: 'no-store',
     });
     if (res.ok) {
