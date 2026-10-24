@@ -2,7 +2,9 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { MapPin, Menu, X, ChevronDown } from 'lucide-react';
+import { MapPin, Menu, X, ChevronDown, Crosshair, Loader2, Check } from 'lucide-react';
+import { useLocation } from '@/lib/location-context';
+import { SERVICE_LOCATIONS } from '@/lib/available-locations';
 
 const VENDOR_MEGA_CATEGORIES = [
   { name: 'Venues & AC Halls', slug: 'venues' },
@@ -23,18 +25,12 @@ const VENDOR_MEGA_CATEGORIES = [
 ];
 
 export const Navbar = () => {
-  const [selectedCity, setSelectedCity] = useState('Anantapur');
+  const { location, isDetecting, requestCurrentLocation, setCityManually } = useLocation();
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
   const [vendorsDropdownOpen, setVendorsDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const availableCities = [
-    { name: 'Anantapur', state: 'Andhra Pradesh', active: true },
-    { name: 'Kurnool', state: 'Andhra Pradesh', active: false, badge: 'Soon' },
-    { name: 'Tirupati', state: 'Andhra Pradesh', active: false, badge: 'Soon' },
-    { name: 'Kadapa', state: 'Andhra Pradesh', active: false, badge: 'Soon' },
-    { name: 'Bengaluru', state: 'Karnataka', active: false, badge: 'Soon' },
-  ];
+  const stateAbbr = location.state === 'Andhra Pradesh' ? 'AP' : location.state === 'Karnataka' ? 'KA' : location.state === 'Telangana' ? 'TS' : location.state?.slice(0, 2).toUpperCase() || 'AP';
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-zinc-200">
@@ -43,66 +39,116 @@ export const Navbar = () => {
           
           {/* Logo & City Selector */}
           <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-9 h-9 rounded-xl bg-zinc-950 flex items-center justify-center text-white font-serif font-bold text-lg shadow-sm">
-                P
+            <Link href="/" className="flex items-center gap-3.5 group">
+              <div className="flex flex-col font-newsreader-36pt text-zinc-950 leading-[0.9] tracking-[-0.02em] select-none">
+                <span className="text-[14px] sm:text-[15px] font-normal tracking-tight">The</span>
+                <span className="text-[22px] sm:text-[26px] font-normal tracking-tight">Gathering Co.</span>
               </div>
-              <div className="flex flex-col">
-                <span className="font-serif font-bold text-xl text-zinc-950 tracking-tight flex items-center gap-1">
-                  PlanMyEvent
-                  <span className="w-2 h-2 rounded-full bg-rose-600 inline-block"></span>
-                </span>
-                <span className="text-[10px] tracking-widest text-zinc-500 uppercase font-medium">
-                  Anantapur &bull; AP
-                </span>
-              </div>
+              <span className="h-6 w-[1px] bg-zinc-200 hidden sm:inline-block"></span>
+              <span className="text-[10px] tracking-widest text-zinc-500 uppercase font-medium hidden sm:inline-block">
+                {location.city} &bull; {stateAbbr}
+              </span>
             </Link>
 
             {/* City Location Picker */}
             <div className="relative hidden md:block">
               <button
                 onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200/80 text-zinc-900 text-xs font-medium transition-colors"
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200/80 text-zinc-900 text-xs font-semibold transition-all border border-zinc-200/60 shadow-sm"
               >
-                <MapPin className="w-3.5 h-3.5 text-rose-600" />
-                <span>{selectedCity}</span>
-                <span className="text-[10px] bg-rose-100 text-rose-700 font-semibold px-1.5 py-0.5 rounded-full">
-                  AP
+                <div className="relative flex items-center justify-center">
+                  <MapPin className="w-3.5 h-3.5 text-rose-600" />
+                  {location.isGPS && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white animate-pulse" />
+                  )}
+                </div>
+                <span>{location.city}</span>
+                <span className="text-[10px] bg-rose-100 text-rose-700 font-bold px-1.5 py-0.2 rounded-full">
+                  {stateAbbr}
                 </span>
+                <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${cityDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {cityDropdownOpen && (
-                <div className="absolute top-full left-0 mt-2 w-60 rounded-2xl bg-white shadow-xl border border-zinc-200 p-2 z-50">
-                  <div className="px-3 py-2 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                    Select City
-                  </div>
-                  {availableCities.map((city) => (
-                    <button
-                      key={city.name}
-                      disabled={!city.active}
-                      onClick={() => {
-                        if (city.active) {
-                          setSelectedCity(city.name);
-                          setCityDropdownOpen(false);
-                        }
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-left transition-all ${
-                        city.active
-                          ? 'hover:bg-rose-50 text-zinc-900 cursor-pointer font-semibold'
-                          : 'text-zinc-400 cursor-not-allowed opacity-60'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <MapPin className={`w-3.5 h-3.5 ${city.active ? 'text-rose-600' : 'text-zinc-300'}`} />
-                        <span>{city.name}</span>
+                <div className="absolute top-full left-0 mt-2 w-72 rounded-2xl bg-white shadow-2xl border border-zinc-200 p-2.5 z-50 animate-fadeIn">
+                  {/* Current GPS Action Button */}
+                  <button
+                    type="button"
+                    disabled={isDetecting}
+                    onClick={async () => {
+                      await requestCurrentLocation();
+                      setCityDropdownOpen(false);
+                    }}
+                    className="w-full mb-3 p-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-200/80 flex items-center justify-between text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center shadow-sm">
+                        {isDetecting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Crosshair className="w-4 h-4 group-hover:rotate-45 transition-transform" />
+                        )}
                       </div>
-                      {city.badge && (
-                        <span className="text-[9px] bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">
-                          {city.badge}
-                        </span>
-                      )}
-                    </button>
-                  ))}
+                      <div>
+                        <div className="text-xs font-bold text-rose-950">
+                          {isDetecting ? 'Detecting GPS...' : 'Use Current Location'}
+                        </div>
+                        <div className="text-[10px] text-rose-700/80">
+                          {location.isGPS ? `GPS Active (${location.city})` : 'Detect city automatically'}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] bg-rose-200 text-rose-900 font-bold px-2 py-0.5 rounded-full">
+                      GPS
+                    </span>
+                  </button>
+
+                  <div className="px-3 py-1.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+                    <span>Locations & Hubs</span>
+                    {location.isGPS && (
+                      <span className="text-emerald-600 text-[10px] font-medium flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Live GPS
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-1 max-h-60 overflow-y-auto">
+                    {SERVICE_LOCATIONS.map((city) => {
+                      const isCurrent = location.city.toLowerCase() === city.city.toLowerCase();
+                      const isActive = city.status === 'ACTIVE';
+
+                      return (
+                        <button
+                          key={city.city}
+                          onClick={() => {
+                            setCityManually(city.city, city.state);
+                            setCityDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-left transition-all ${
+                            isCurrent
+                              ? 'bg-rose-50/80 text-rose-900 font-bold'
+                              : 'hover:bg-zinc-100 text-zinc-800 font-medium'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <MapPin className={`w-3.5 h-3.5 ${isCurrent ? 'text-rose-600' : isActive ? 'text-emerald-600' : 'text-zinc-400'}`} />
+                            <span>{city.city}</span>
+                            <span className="text-[10px] text-zinc-400 font-normal">({city.state})</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                                isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-100 text-zinc-500'
+                              }`}
+                            >
+                              {isActive ? 'Live' : 'Expanding'}
+                            </span>
+                            {isCurrent && <Check className="w-3.5 h-3.5 text-rose-600" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -180,15 +226,8 @@ export const Navbar = () => {
             </Link>
           </nav>
 
-          {/* Admin & Start Planning CTAs */}
+          {/* Start Planning CTA */}
           <div className="hidden md:flex items-center gap-4">
-            <Link
-              href="/admin"
-              className="text-xs font-semibold text-zinc-500 hover:text-zinc-950 transition-colors"
-            >
-              Admin Portal
-            </Link>
-
             <Link
               href="/my-event"
               className="px-5 py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-bold transition-all shadow-sm"
@@ -214,10 +253,23 @@ export const Navbar = () => {
         <div className="md:hidden bg-white border-b border-zinc-200 px-4 pt-4 pb-6 space-y-4 shadow-lg">
           <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
             <span className="text-xs text-zinc-500 font-medium">Location:</span>
-            <span className="text-xs font-bold text-zinc-900 flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-rose-600" />
-              Anantapur, AP
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-zinc-900 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-rose-600" />
+                {location.city}, {stateAbbr}
+              </span>
+              <button
+                type="button"
+                disabled={isDetecting}
+                onClick={async () => {
+                  await requestCurrentLocation();
+                }}
+                className="p-1 px-2 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200 flex items-center gap-1"
+              >
+                {isDetecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Crosshair className="w-3 h-3" />}
+                <span>GPS</span>
+              </button>
+            </div>
           </div>
           <nav className="flex flex-col gap-3 text-sm font-semibold text-zinc-900">
             <Link href="/" onClick={() => setMobileMenuOpen(false)}>
@@ -245,9 +297,6 @@ export const Navbar = () => {
             </div>
             <Link href="/inspiration" onClick={() => setMobileMenuOpen(false)}>
               Inspiration
-            </Link>
-            <Link href="/admin" className="text-zinc-500 pt-2 border-t" onClick={() => setMobileMenuOpen(false)}>
-              Admin Portal
             </Link>
           </nav>
 

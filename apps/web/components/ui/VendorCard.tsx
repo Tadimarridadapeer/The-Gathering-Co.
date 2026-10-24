@@ -68,7 +68,7 @@ export const VendorCard = ({ vendor }: { vendor: VendorProps }) => {
           {/* Rating Bottom Right */}
           <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-xl bg-white text-zinc-950 text-xs font-bold flex items-center gap-1 shadow-sm">
             <Star className="w-3.5 h-3.5 fill-rose-600 text-rose-600" />
-            <span>{vendor.rating.toFixed(1)}</span>
+            <span>{(Number(vendor.rating) || 5.0).toFixed(1)}</span>
             <span className="text-[10px] text-zinc-500 font-normal">({vendor.reviewCount})</span>
           </div>
         </div>

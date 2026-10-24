@@ -3,14 +3,48 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { X, Check, Trash2, Plus, AlertCircle } from 'lucide-react';
+import {
+  X,
+  Check,
+  Trash2,
+  Plus,
+  AlertCircle,
+  Star,
+  Phone,
+  MapPin,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  CheckCircle2,
+  Building2,
+  Utensils,
+  Camera,
+  Palette,
+  Flower2,
+  Mail,
+  Music,
+  Car,
+  Gift,
+} from 'lucide-react';
+import { useLocation } from '@/lib/location-context';
+import {
+  ANANTAPUR_VENDORS,
+  KADAPA_VENDORS,
+  getVendorsForCategory,
+  mapCategoryToSlug,
+  isCitySupported,
+  VendorItem,
+} from '@/lib/anantapur-vendors';
+import { QuoteRequestModal } from '@/components/ui/QuoteRequestModal';
+import { LocalExpansionCard } from '@/components/ui/LocalExpansionCard';
 
 interface BudgetItem {
   category: string;
+  categorySlug: string;
   allocatedAmount: number;
   spentAmount: number;
   breakdownDetail?: string;
-  targetNegotiatedPrice?: number;
 }
 
 interface TaskItem {
@@ -50,23 +84,86 @@ const MILESTONE_CATEGORIES = [
   'Invitations',
 ];
 
+function getCategoryIcon(categorySlug: string) {
+  switch (categorySlug) {
+    case 'venues':
+      return <Building2 className="w-4 h-4 text-zinc-700" />;
+    case 'caterers':
+      return <Utensils className="w-4 h-4 text-zinc-700" />;
+    case 'photographers':
+      return <Camera className="w-4 h-4 text-zinc-700" />;
+    case 'makeup-artists':
+      return <Palette className="w-4 h-4 text-zinc-700" />;
+    case 'decorators':
+      return <Flower2 className="w-4 h-4 text-zinc-700" />;
+    case 'invitation-designers':
+      return <Mail className="w-4 h-4 text-zinc-700" />;
+    case 'djs':
+      return <Music className="w-4 h-4 text-zinc-700" />;
+    case 'wedding-cars':
+      return <Car className="w-4 h-4 text-zinc-700" />;
+    case 'return-gifts':
+      return <Gift className="w-4 h-4 text-zinc-700" />;
+    default:
+      return <Sparkles className="w-4 h-4 text-zinc-700" />;
+  }
+}
+
 function EventWorkspaceContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  const { location } = useLocation();
   const eventType = searchParams.get('eventType') || 'Wedding';
-  const city = searchParams.get('city') || 'Anantapur';
+  const city = searchParams.get('city') || location.city || 'Anantapur';
   const eventDate = searchParams.get('eventDate') || '2026-12-15';
   const guestCount = Number(searchParams.get('guestCount')) || 500;
-  const initialBudget = Number(searchParams.get('budget')) || 90000;
+  const initialBudget = Number(searchParams.get('budget')) || 800000;
 
   const [totalBudget, setTotalBudget] = useState(initialBudget);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [tempBudgetInput, setTempBudgetInput] = useState(initialBudget);
 
-  const [negotiatingCategory, setNegotiatingCategory] = useState<string | null>(null);
-  const [negotiateTarget, setNegotiateTarget] = useState<number>(0);
-  const [negotiationSubmitted, setNegotiationSubmitted] = useState<string | null>(null);
+  // Quote modal state
+  const [quoteVendor, setQuoteVendor] = useState<VendorItem | null>(null);
+
+  // Helper to get initial default selected vendors based on active city
+  const getDefaultSelected = (cityName: string) => {
+    const isK = cityName.toLowerCase() === 'kadapa';
+    if (isK) {
+      return {
+        venues: KADAPA_VENDORS.find((v) => v.slug === 'dsr-paradise-function-hall-kadapa') || null,
+        caterers: KADAPA_VENDORS.find((v) => v.slug === 'sri-balaji-caterers-kadapa') || null,
+        photographers: KADAPA_VENDORS.find((v) => v.slug === 'al-studios-kadapa') || null,
+        'makeup-artists': KADAPA_VENDORS.find((v) => v.slug === 'naari-makeovers-kadapa') || null,
+      };
+    }
+    return {
+      venues: ANANTAPUR_VENDORS.find((v) => v.slug === 'city-convention-hall-anantapur') || null,
+      caterers: ANANTAPUR_VENDORS.find((v) => v.slug === 'rs-food-caterers-anantapur') || null,
+      photographers: ANANTAPUR_VENDORS.find((v) => v.slug === 'smile-digital-photo-studio-anantapur') || null,
+      'makeup-artists': ANANTAPUR_VENDORS.find((v) => v.slug === 'skynn-and-soul-beauty-salon-anantapur') || null,
+    };
+  };
+
+  // Selected vendors per category slug
+  const [selectedVendors, setSelectedVendors] = useState<Record<string, VendorItem | null>>(() =>
+    getDefaultSelected(city)
+  );
+
+  useEffect(() => {
+    setSelectedVendors(getDefaultSelected(city));
+  }, [city]);
+
+  // Expand only when user clicks "View Vendors". Default: ALL COLLAPSED.
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  const toggleCategoryExpand = (cat: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [cat]: !prev[cat],
+    }));
+  };
 
   // Dynamic realistic allocation engine
   const calculateAllocations = (budgetVal: number, type: string): BudgetItem[] => {
@@ -79,47 +176,50 @@ function EventWorkspaceContent() {
         { category: 'Bridal Makeup', pct: 0.05, detail: 'HD makeup, hair styling & saree draping' },
         { category: 'Invitations & Cards', pct: 0.03, detail: 'Printed cards & digital video e-invites' },
         {
-          category: 'Miscellaneous Extra Charges',
+          category: 'Miscellaneous & Contingency',
           pct: 0.12,
-          detail: 'Generator fuel backup, cleaning crew, local transport & emergency cash buffer',
+          detail: 'Power backup generator, transport, cleaning crew & buffer reserve',
         },
       ],
       Engagement: [
-        { category: 'Venue', pct: 0.20, detail: 'Function hall & stage setup' },
-        { category: 'Catering', pct: 0.40, detail: 'Lunch / dinner buffet per guest' },
-        { category: 'Decoration', pct: 0.18, detail: 'Flower stage & ring ceremony backdrop' },
-        { category: 'Photography', pct: 0.12, detail: 'Candid photo & video coverage' },
+        { category: 'Venue & Hall', pct: 0.20, detail: 'Function hall & stage setup' },
+        { category: 'Catering & Meals', pct: 0.40, detail: 'Lunch / dinner buffet per guest' },
+        { category: 'Decoration & Mandap', pct: 0.18, detail: 'Flower stage & ring ceremony backdrop' },
+        { category: 'Photography & Video', pct: 0.12, detail: 'Candid photo & video coverage' },
         {
-          category: 'Miscellaneous Extra Charges',
+          category: 'Miscellaneous & Contingency',
           pct: 0.10,
           detail: 'Power backup, transport & incidental expenses',
         },
       ],
       Birthday: [
-        { category: 'Venue & Lawn', pct: 0.25, detail: 'Party space / hall rental' },
-        { category: 'Food & Snacks', pct: 0.40, detail: 'Buffet dinner & welcome snacks' },
-        { category: 'Theme Decoration', pct: 0.20, detail: 'Balloon arches & cake backdrop' },
-        { category: 'Cake & Return Gifts', pct: 0.15, detail: 'Customized cake & return gift hampers' },
+        { category: 'Venue & Hall', pct: 0.25, detail: 'Party space / hall rental' },
+        { category: 'Catering & Meals', pct: 0.40, detail: 'Buffet dinner & welcome snacks' },
+        { category: 'Decoration & Mandap', pct: 0.20, detail: 'Balloon arches & cake backdrop' },
+        { category: 'Invitations & Cards', pct: 0.15, detail: 'Customized cards & return gift hampers' },
       ],
     };
 
     const selRules = rules[type] || rules['Wedding'];
-    const commitFactor = 0.967; 
+    const commitFactor = 0.967;
     const effectiveSpendable = Math.round(budgetVal * commitFactor);
 
     return selRules.map((r) => {
       const allocated = Math.round(effectiveSpendable * r.pct);
+      const catSlug = mapCategoryToSlug(r.category);
       return {
         category: r.category,
+        categorySlug: catSlug,
         allocatedAmount: allocated,
         spentAmount: Math.round(allocated * 0.98),
         breakdownDetail: r.detail,
-        targetNegotiatedPrice: Math.round(allocated * 0.92),
       };
     });
   };
 
-  const [allocations, setAllocations] = useState<BudgetItem[]>([]);
+  const [allocations, setAllocations] = useState<BudgetItem[]>(() =>
+    calculateAllocations(initialBudget, eventType)
+  );
 
   useEffect(() => {
     setAllocations(calculateAllocations(totalBudget, eventType));
@@ -135,7 +235,6 @@ function EventWorkspaceContent() {
     setTotalBudget(tempBudgetInput);
     setShowAdjustModal(false);
 
-    // Update query params
     const newParams = new URLSearchParams(searchParams.toString());
     newParams.set('budget', tempBudgetInput.toString());
     router.replace(`/my-event?${newParams.toString()}`);
@@ -143,116 +242,94 @@ function EventWorkspaceContent() {
 
   // Milestones tasks
   const [tasks, setTasks] = useState<TaskItem[]>([
-    { id: 't1', title: 'Lock Anantapur venue date and confirm advance payment', completed: true, category: 'Venue' },
-    { id: 't2', title: 'Finalize Rayalaseema menu items with caterer', completed: true, category: 'Catering' },
-    { id: 't3', title: 'Sign photography contract for candid and wedding album', completed: false, category: 'Photography' },
-    { id: 't4', title: 'Approve stage flower mandap design draft', completed: false, category: 'Decoration' },
-    { id: 't5', title: 'Confirm bridal makeup slot and hair trial', completed: false, category: 'Makeup' },
+    { id: 't1', title: 'Lock venue date and pay confirmation advance', completed: true, category: 'Venue' },
+    { id: 't2', title: 'Finalize menu options and dietary requirements with caterer', completed: true, category: 'Catering' },
+    { id: 't3', title: 'Review photography package and sign contract', completed: false, category: 'Photography' },
+    { id: 't4', title: 'Book bridal makeup trial session', completed: false, category: 'Makeup' },
+    { id: 't5', title: 'Finalize mandap floral styling and stage entrance', completed: false, category: 'Decoration' },
   ]);
 
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('General');
+  const [selectedCategory, setSelectedCategory] = useState('Venue');
   const [inputError, setInputError] = useState(false);
 
-  // Load from localStorage if available
-  useEffect(() => {
-    try {
-      const savedTasks = localStorage.getItem(`milestones_${eventType}`);
-      if (savedTasks) {
-        setTasks(JSON.parse(savedTasks));
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }, [eventType]);
-
-  const saveTasksToStorage = (updatedTasks: TaskItem[]) => {
-    setTasks(updatedTasks);
-    try {
-      localStorage.setItem(`milestones_${eventType}`, JSON.stringify(updatedTasks));
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const toggleTask = (id: string) => {
-    const updated = tasks.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t));
-    saveTasksToStorage(updated);
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+    );
   };
 
   const deleteTask = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const updated = tasks.filter((t) => t.id !== id);
-    saveTasksToStorage(updated);
+    setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
   const handleAddMilestoneSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) {
       setInputError(true);
-      setTimeout(() => setInputError(false), 3000);
       return;
     }
-
-    const updated = [
-      ...tasks,
-      {
-        id: Date.now().toString(),
-        title: newTaskTitle.trim(),
-        completed: false,
-        category: selectedCategory,
-      },
-    ];
-    saveTasksToStorage(updated);
+    const newTask: TaskItem = {
+      id: 'task_' + Date.now(),
+      title: newTaskTitle.trim(),
+      completed: false,
+      category: selectedCategory,
+    };
+    setTasks((prev) => [newTask, ...prev]);
     setNewTaskTitle('');
     setInputError(false);
   };
 
   const addPresetMilestone = (preset: { title: string; category: string }) => {
-    if (tasks.some((t) => t.title.toLowerCase() === preset.title.toLowerCase())) return;
-    const updated = [
-      ...tasks,
-      {
-        id: Date.now().toString(),
-        title: preset.title,
-        completed: false,
-        category: preset.category,
-      },
-    ];
-    saveTasksToStorage(updated);
+    const alreadyExists = tasks.some((t) => t.title.toLowerCase() === preset.title.toLowerCase());
+    if (alreadyExists) return;
+    const newTask: TaskItem = {
+      id: 'task_' + Date.now(),
+      title: preset.title,
+      completed: false,
+      category: preset.category,
+    };
+    setTasks((prev) => [newTask, ...prev]);
   };
 
   const completedTaskCount = tasks.filter((t) => t.completed).length;
 
-  const handleOpenNegotiate = (category: string, currentAmount: number) => {
-    setNegotiatingCategory(category);
-    setNegotiateTarget(Math.round(currentAmount * 0.95));
+  const handleSelectVendor = (catSlug: string, vendor: VendorItem) => {
+    setSelectedVendors((prev) => ({
+      ...prev,
+      [catSlug]: vendor,
+    }));
   };
 
-  const handleSubmitNegotiation = (e: React.FormEvent) => {
-    e.preventDefault();
-    setNegotiationSubmitted(
-      `Negotiation request sent for ${negotiatingCategory}! We will request the vendor in Anantapur to adjust price to ₹${negotiateTarget.toLocaleString('en-IN')}.`,
-    );
-    setTimeout(() => {
-      setNegotiatingCategory(null);
-      setNegotiationSubmitted(null);
-    }, 4000);
+  const handleRemoveSelectedVendor = (catSlug: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedVendors((prev) => ({
+      ...prev,
+      [catSlug]: null,
+    }));
   };
+
+  const isSupported = isCitySupported(city);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       
-      {/* Event Header Banner */}
-      <div className="bg-zinc-950 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="space-y-2">
-          <div className="text-xs font-bold text-rose-500 uppercase tracking-widest">
-            Event Command Center
-          </div>
-          <h1 className="font-serif font-bold text-3xl sm:text-4xl text-white">
+      {/* Location Notice Banner if city has no local vendors yet */}
+      {!isSupported && (
+        <LocalExpansionCard city={city} />
+      )}
+
+      {/* Header Banner */}
+      <div className="bg-zinc-950 rounded-2xl p-6 sm:p-8 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
+        <div className="space-y-1.5">
+          <span className="text-[11px] font-semibold tracking-wider uppercase text-zinc-400">
+            Event Plan Workspace
+          </span>
+          <h1 className="font-serif font-bold text-2xl sm:text-3xl text-white">
             My {eventType} Plan
           </h1>
-          <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-300 font-medium pt-1">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-300 pt-0.5">
             <span>
               {new Date(eventDate).toLocaleDateString('en-IN', {
                 day: 'numeric',
@@ -261,19 +338,22 @@ function EventWorkspaceContent() {
               })}
             </span>
             <span>&bull;</span>
-            <span>{city}</span>
+            <span className="flex items-center gap-1 text-white font-medium">
+              <MapPin className="w-3.5 h-3.5 text-zinc-400" />
+              {city}
+            </span>
             <span>&bull;</span>
             <span>{guestCount} Guests</span>
           </div>
         </div>
 
         {/* Budget Pill in Banner */}
-        <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800 w-full md:w-auto text-center md:text-right space-y-1">
-          <span className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider block">
-            Total Event Budget
+        <div className="bg-zinc-900/90 border border-zinc-800 p-4 rounded-xl text-center md:text-right min-w-[200px] space-y-1">
+          <span className="text-[11px] text-zinc-400 font-medium block">
+            Target Budget
           </span>
           <div className="flex items-center justify-center md:justify-end gap-2">
-            <span className="font-serif font-extrabold text-2xl text-rose-500">
+            <span className="font-serif font-bold text-2xl text-white">
               ₹{totalBudget.toLocaleString('en-IN')}
             </span>
             <button
@@ -281,7 +361,7 @@ function EventWorkspaceContent() {
                 setTempBudgetInput(totalBudget);
                 setShowAdjustModal(true);
               }}
-              className="px-2.5 py-1 text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors"
+              className="px-2.5 py-1 text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg transition-colors"
             >
               Adjust
             </button>
@@ -290,64 +370,57 @@ function EventWorkspaceContent() {
       </div>
 
       {/* Financial Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         
-        {/* Total Estimation */}
-        <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-card space-y-2">
+        {/* Card 1: Total Budget */}
+        <div className="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-xs space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total Event Budget</span>
+            <span className="text-xs font-semibold text-zinc-500">Planned Budget</span>
             <button
               onClick={() => {
                 setTempBudgetInput(totalBudget);
                 setShowAdjustModal(true);
               }}
-              className="text-xs font-bold text-rose-600 hover:underline"
+              className="text-xs font-semibold text-zinc-900 hover:underline"
             >
-              Change
+              Edit
             </button>
           </div>
-          <div className="font-serif font-extrabold text-3xl text-zinc-950">
+          <div className="font-serif font-bold text-2xl text-zinc-950">
             ₹{totalBudget.toLocaleString('en-IN')}
           </div>
-          <p className="text-xs text-zinc-500">Your total planned budget cap for {eventType}</p>
+          <p className="text-xs text-zinc-500">Total planned cap for {eventType}</p>
         </div>
 
-        {/* Estimated Spent */}
-        <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-card space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Estimated Spent</span>
-          <div className="font-serif font-extrabold text-3xl text-zinc-950">
+        {/* Card 2: Estimated Spend */}
+        <div className="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-xs space-y-1.5">
+          <span className="text-xs font-semibold text-zinc-500">Estimated Committed</span>
+          <div className="font-serif font-bold text-2xl text-zinc-950">
             ₹{totalCommittedSpent.toLocaleString('en-IN')}
           </div>
-          <p className="text-xs text-zinc-500">Allocated across vendors &amp; extra charges</p>
+          <p className="text-xs text-zinc-500">Allocated across event services</p>
         </div>
 
-        {/* Remaining Savings Buffer */}
-        <div className="bg-rose-50/70 p-6 rounded-3xl border border-rose-200 space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Remaining Savings Buffer</span>
-          <div className="font-serif font-extrabold text-3xl text-rose-600">
+        {/* Card 3: Contingency Buffer */}
+        <div className="bg-zinc-50 p-5 rounded-2xl border border-zinc-200/80 shadow-xs space-y-1.5">
+          <span className="text-xs font-semibold text-zinc-600">Reserve Buffer</span>
+          <div className="font-serif font-bold text-2xl text-emerald-700">
             ₹{totalSavingsBuffer.toLocaleString('en-IN')}
           </div>
-          <p className="text-xs text-rose-700 font-medium">
-            You can save up to ₹{totalSavingsBuffer.toLocaleString('en-IN')} or keep for emergency buffer!
-          </p>
+          <p className="text-xs text-zinc-500">Unallocated reserve for contingencies</p>
         </div>
 
       </div>
 
-      {/* Negotiation Notification Toast */}
-      {negotiationSubmitted && (
-        <div className="p-4 rounded-2xl bg-zinc-950 text-white border border-rose-500 text-xs font-medium animate-fadeIn">
-          ✓ {negotiationSubmitted}
-        </div>
-      )}
-
-      {/* Budget Allocation Breakdown Table */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200 shadow-card space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* BUDGET ALLOCATION BREAKDOWN (ONLY SHOWS VENDORS WHEN USER CLICKS "VIEW VENDORS") */}
+      <div className="bg-white rounded-2xl p-6 sm:p-7 border border-zinc-200/80 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-zinc-100">
           <div>
-            <h2 className="font-serif font-bold text-2xl text-zinc-950">Budget Allocation Breakdown</h2>
+            <h2 className="font-serif font-bold text-xl sm:text-2xl text-zinc-950">
+              Budget Breakdown
+            </h2>
             <p className="text-xs text-zinc-500 mt-0.5">
-              Transparent cost segmentation for ₹{totalBudget.toLocaleString('en-IN')} total budget
+              Service allocations for your celebration. Click &ldquo;View Vendors&rdquo; to browse and select providers in {city}.
             </p>
           </div>
 
@@ -356,89 +429,245 @@ function EventWorkspaceContent() {
               setTempBudgetInput(totalBudget);
               setShowAdjustModal(true);
             }}
-            className="px-5 py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold transition-all"
           >
-            Adjust Total Budget
+            Adjust Budget
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-zinc-200 text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Details &amp; Included Services</th>
-                <th className="py-3 px-4">Allocated Amount</th>
-                <th className="py-3 px-4 text-right">Actions / Vendor Negotiation</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 text-xs text-zinc-900 font-medium">
-              {allocations.map((item) => (
-                <tr key={item.category} className="hover:bg-zinc-50 transition-colors">
-                  <td className="py-4 px-4 font-bold text-zinc-950 whitespace-nowrap">{item.category}</td>
-                  <td className="py-4 px-4 text-zinc-600 max-w-md">{item.breakdownDetail}</td>
-                  <td className="py-4 px-4 font-extrabold text-zinc-950 whitespace-nowrap">
-                    ₹{item.spentAmount.toLocaleString('en-IN')}
-                  </td>
-                  <td className="py-4 px-4 text-right space-x-2 whitespace-nowrap">
-                    <button
-                      onClick={() => handleOpenNegotiate(item.category, item.spentAmount)}
-                      className="inline-block text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 transition-colors"
-                    >
-                      Negotiate Price
-                    </button>
-                    <Link
-                      href={`/vendors?category=${item.category.toLowerCase().split(' ')[0]}`}
-                      className="inline-block text-xs font-bold text-zinc-900 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      Browse Vendors
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* List of Categories with Matched Vendors on Click */}
+        <div className="divide-y divide-zinc-100">
+          {allocations.map((item) => {
+            const matchedVendors = getVendorsForCategory(item.categorySlug, city);
+            const isExpanded = !!expandedCategories[item.category];
+            const selected = selectedVendors[item.categorySlug];
+
+            return (
+              <div key={item.category} className="py-4 first:pt-0 last:pb-0 space-y-3">
+                
+                {/* Clean Row Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  
+                  {/* Left: Category info & selected badge */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-lg bg-zinc-100 text-zinc-700">
+                        {getCategoryIcon(item.categorySlug)}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-sm sm:text-base text-zinc-900">
+                            {item.category}
+                          </h3>
+                          {matchedVendors.length > 0 && (
+                            <span className="text-[11px] text-zinc-400 font-normal">
+                              ({matchedVendors.length} {matchedVendors.length === 1 ? 'vendor' : 'vendors'})
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-zinc-500">
+                          {item.breakdownDetail}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Selected Vendor Pill */}
+                    {selected && (
+                      <div className="mt-1.5 inline-flex flex-wrap items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-50/80 border border-emerald-200/80 text-emerald-900 text-xs">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                        <span>
+                          Selected: <strong className="font-semibold text-zinc-950">{selected.businessName}</strong>
+                        </span>
+                        <span className="flex items-center gap-1 font-semibold text-zinc-800 bg-white px-1.5 py-0.5 rounded border border-emerald-200 text-[11px]">
+                          <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                          <span>{selected.rating.toFixed(1)}</span>
+                          <span className="text-zinc-500 font-normal">({selected.reviewCount})</span>
+                        </span>
+                        <span className="text-zinc-600 font-medium text-[11px]">&bull; ₹{selected.startingPrice.toLocaleString('en-IN')}</span>
+                        <button
+                          onClick={(e) => handleRemoveSelectedVendor(item.categorySlug, e)}
+                          className="text-[11px] text-zinc-500 hover:text-rose-600 ml-1 underline cursor-pointer font-medium"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Allocation Amount & Action Buttons */}
+                  <div className="flex items-center justify-between md:justify-end gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-zinc-100">
+                    <div className="text-left md:text-right">
+                      <span className="text-[10px] text-zinc-400 uppercase tracking-wider block font-medium">
+                        Allocated
+                      </span>
+                      <span className="font-serif font-bold text-base sm:text-lg text-zinc-950">
+                        ₹{item.spentAmount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {matchedVendors.length > 0 && (
+                        <button
+                          onClick={() => toggleCategoryExpand(item.category)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                            isExpanded
+                              ? 'bg-zinc-900 text-white border-zinc-900'
+                              : 'bg-white hover:bg-zinc-50 text-zinc-800 border-zinc-200'
+                          }`}
+                        >
+                          <span>{isExpanded ? 'Hide Vendors' : `View Vendors (${matchedVendors.length})`}</span>
+                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
+
+                      {item.categorySlug && (
+                        <Link
+                          href={`/vendors?city=${encodeURIComponent(city)}&category=${item.categorySlug}`}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
+                        >
+                          Browse All
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* EXPANDABLE VENDORS LIST: ONLY SHOWN WHEN USER CLICKS "VIEW VENDORS" */}
+                {isExpanded && matchedVendors.length > 0 && (
+                  <div className="mt-2 p-4 rounded-xl bg-zinc-50/70 border border-zinc-200/70 space-y-3 animate-fadeIn">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-zinc-700">
+                        Verified {item.category} in {city}
+                      </span>
+                      <Link
+                        href={`/vendors?city=${encodeURIComponent(city)}&category=${item.categorySlug}`}
+                        className="text-zinc-500 hover:text-zinc-900 hover:underline flex items-center gap-1"
+                      >
+                        <span>Open directory</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {matchedVendors.map((vendor) => {
+                        const isSelected = selected?.id === vendor.id;
+
+                        return (
+                          <div
+                            key={vendor.id}
+                            className={`p-3.5 rounded-xl border bg-white transition-all flex flex-col justify-between gap-3 ${
+                              isSelected
+                                ? 'border-emerald-500 ring-1 ring-emerald-500/30'
+                                : 'border-zinc-200/80 hover:border-zinc-300 shadow-xs'
+                            }`}
+                          >
+                            <div className="space-y-1.5">
+                              {/* Vendor Header */}
+                              <div className="flex items-start justify-between gap-2">
+                                <Link
+                                  href={`/vendors/${vendor.slug}`}
+                                  className="font-medium text-sm text-zinc-900 hover:text-rose-600 transition-colors line-clamp-1"
+                                >
+                                  {vendor.businessName}
+                                </Link>
+                                <span className="flex-shrink-0 flex items-center gap-1 text-[11px] font-semibold text-zinc-800 bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">
+                                  <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                                  {vendor.rating.toFixed(1)} <span className="text-zinc-500 font-normal">({vendor.reviewCount})</span>
+                                </span>
+                              </div>
+
+                              {/* Address */}
+                              <div className="flex items-center gap-1 text-[11px] text-zinc-500 line-clamp-1">
+                                <MapPin className="w-3 h-3 flex-shrink-0 text-zinc-400" />
+                                <span>{vendor.address}</span>
+                              </div>
+
+                              {/* Phone direct link */}
+                              {vendor.phone && (
+                                <div className="flex items-center gap-1 text-[11px] text-zinc-700 font-mono">
+                                  <Phone className="w-3 h-3 flex-shrink-0 text-zinc-400" />
+                                  <a href={`tel:${vendor.phone.replace(/\s+/g, '')}`} className="hover:underline">
+                                    {vendor.phone}
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Pricing & Selection Actions */}
+                            <div className="pt-2 border-t border-zinc-100 flex items-center justify-between gap-2">
+                              <div>
+                                <span className="text-[9px] text-zinc-400 uppercase font-medium block">Starting</span>
+                                <span className="font-semibold text-xs text-zinc-900">
+                                  ₹{vendor.startingPrice.toLocaleString('en-IN')}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => setQuoteVendor(vendor)}
+                                  className="px-2.5 py-1 rounded-md bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[11px] font-medium transition-colors cursor-pointer"
+                                >
+                                  Quote
+                                </button>
+                                <button
+                                  onClick={() => handleSelectVendor(item.categorySlug, vendor)}
+                                  className={`px-3 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-zinc-900 hover:bg-zinc-800 text-white'
+                                  }`}
+                                >
+                                  {isSelected ? '✓ Selected' : 'Select'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* ADJUST TOTAL BUDGET MODAL */}
       {showAdjustModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-zinc-200 shadow-2xl relative space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl p-6 sm:p-7 max-w-lg w-full border border-zinc-200 shadow-xl relative space-y-5">
             <button
               onClick={() => setShowAdjustModal(false)}
-              className="absolute top-5 right-5 p-2 rounded-full text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
 
             <div className="space-y-1">
-              <span className="text-xs font-bold text-rose-600 uppercase tracking-widest">
-                Event Budget Manager
-              </span>
-              <h3 className="font-serif font-bold text-2xl text-zinc-950">
-                Adjust Your Total Event Budget
+              <h3 className="font-serif font-bold text-xl text-zinc-950">
+                Adjust Event Budget
               </h3>
               <p className="text-xs text-zinc-500">
-                Enter your revised budget cap. The breakdown table will recalculate line items automatically.
+                Update your overall budget cap. Service allocations will recalculate automatically.
               </p>
             </div>
 
-            <form onSubmit={handleApplyNewBudget} className="space-y-5">
+            <form onSubmit={handleApplyNewBudget} className="space-y-4">
               {/* Presets */}
               <div>
-                <label className="block text-xs font-bold text-zinc-800 mb-2">
-                  Select Quick Preset
+                <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
+                  Preset Amounts
                 </label>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
                   {BUDGET_PRESETS.map((preset) => (
                     <button
                       type="button"
                       key={preset.value}
                       onClick={() => setTempBudgetInput(preset.value)}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold text-center border transition-all ${
+                      className={`py-1.5 px-2.5 rounded-lg text-xs font-medium text-center border transition-all cursor-pointer ${
                         tempBudgetInput === preset.value
-                          ? 'border-rose-600 bg-rose-50 text-rose-700 shadow-sm'
+                          ? 'border-zinc-900 bg-zinc-900 text-white'
                           : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-zinc-300'
                       }`}
                     >
@@ -450,34 +679,34 @@ function EventWorkspaceContent() {
 
               {/* Custom Input */}
               <div>
-                <label className="block text-xs font-bold text-zinc-800 mb-1">
-                  Or Enter Custom Total Budget (₹)
+                <label className="block text-xs font-semibold text-zinc-700 mb-1">
+                  Custom Budget (₹)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-3 text-sm font-bold text-zinc-400">₹</span>
+                  <span className="absolute left-3.5 top-2.5 text-sm font-semibold text-zinc-400">₹</span>
                   <input
                     type="number"
                     min={10000}
                     step={5000}
                     value={tempBudgetInput}
                     onChange={(e) => setTempBudgetInput(Number(e.target.value))}
-                    className="w-full pl-8 pr-4 py-3 rounded-xl border border-zinc-200 text-base font-extrabold text-zinc-950 focus:ring-2 focus:ring-rose-500 focus:outline-none bg-white"
+                    className="w-full pl-8 pr-3.5 py-2 rounded-xl border border-zinc-200 text-sm font-bold text-zinc-950 focus:ring-2 focus:ring-zinc-900 focus:outline-none bg-white"
                   />
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2 pt-2">
                 <button
                   type="submit"
-                  className="flex-1 py-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-md transition-all"
+                  className="flex-1 py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-medium text-xs shadow-xs transition-all cursor-pointer"
                 >
-                  Apply New Budget
+                  Save Changes
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAdjustModal(false)}
-                  className="px-5 py-3.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition-colors"
+                  className="px-4 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-medium text-xs transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -487,63 +716,34 @@ function EventWorkspaceContent() {
         </div>
       )}
 
-      {/* Price Negotiation Modal */}
-      {negotiatingCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-zinc-200 shadow-2xl space-y-4">
-            <h3 className="font-serif font-bold text-xl text-zinc-950">
-              Negotiate {negotiatingCategory}
-            </h3>
-            <p className="text-xs text-zinc-600">
-              Request vendors in Anantapur to adjust pricing for your requirements. For example, if current venue allocation is ₹11,500, ask them to accept ₹11,000.
-            </p>
-
-            <form onSubmit={handleSubmitNegotiation} className="space-y-4 pt-2">
-              <div>
-                <label className="block text-xs font-bold text-zinc-800 mb-1">Your Proposed Target Price (₹)</label>
-                <input
-                  type="number"
-                  value={negotiateTarget}
-                  onChange={(e) => setNegotiateTarget(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 text-sm font-bold text-zinc-950 focus:ring-2 focus:ring-rose-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-zinc-950 text-white font-bold text-xs shadow-md"
-                >
-                  Send Price Request to Vendor
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNegotiatingCategory(null)}
-                  className="px-4 py-2.5 rounded-xl bg-zinc-100 text-zinc-700 font-bold text-xs"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Quote Request Modal */}
+      {quoteVendor && (
+        <QuoteRequestModal
+          vendorId={quoteVendor.id}
+          vendorName={quoteVendor.businessName}
+          rating={quoteVendor.rating}
+          reviewCount={quoteVendor.reviewCount}
+          startingPrice={quoteVendor.startingPrice}
+          address={quoteVendor.address}
+          onClose={() => setQuoteVendor(null)}
+        />
       )}
 
       {/* Action Plan & Milestones */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200 shadow-card space-y-6">
+      <div className="bg-white rounded-2xl p-6 sm:p-7 border border-zinc-200/80 shadow-xs space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-serif font-bold text-2xl text-zinc-950">Event Milestones</h2>
+            <h2 className="font-serif font-bold text-xl sm:text-2xl text-zinc-950">Event Milestones</h2>
             <p className="text-xs text-zinc-500 mt-0.5">
-              Key action items to lock in your event in {city}
+              Checklist for coordinating your event in {city}
             </p>
           </div>
-          <span className="text-xs font-bold text-zinc-600 bg-zinc-100 px-3 py-1 rounded-full">
+          <span className="text-xs font-medium text-zinc-600 bg-zinc-100 px-2.5 py-1 rounded-md">
             {completedTaskCount} of {tasks.length} Completed
           </span>
         </div>
 
-        {/* Add Task Form with Category Dropdown & Validation */}
+        {/* Add Task Form */}
         <form onSubmit={handleAddMilestoneSubmit} className="space-y-3">
           <div className="flex flex-col sm:flex-row gap-2">
             <input
@@ -553,16 +753,16 @@ function EventWorkspaceContent() {
                 setNewTaskTitle(e.target.value);
                 if (inputError) setInputError(false);
               }}
-              placeholder="Add new event milestone (e.g., Book DJ & Sound System)..."
-              className={`flex-1 px-4 py-2.5 rounded-xl border text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none transition-all ${
-                inputError ? 'border-rose-500 bg-rose-50/50' : 'border-zinc-200'
+              placeholder="Add event milestone (e.g., Finalize flower entry arch)..."
+              className={`flex-1 px-3.5 py-2 rounded-xl border text-xs font-medium focus:ring-2 focus:ring-zinc-900 focus:outline-none transition-all ${
+                inputError ? 'border-rose-400 bg-rose-50/50' : 'border-zinc-200'
               }`}
             />
 
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3.5 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-800 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+              className="px-3 py-2 rounded-xl border border-zinc-200 bg-zinc-50 text-xs font-medium text-zinc-800 focus:ring-2 focus:ring-zinc-900 focus:outline-none"
             >
               {MILESTONE_CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
@@ -573,26 +773,25 @@ function EventWorkspaceContent() {
 
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
+              className="px-4 py-2 rounded-xl bg-zinc-950 hover:bg-zinc-800 text-white font-medium text-xs transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> Add Milestone
+              <Plus className="w-4 h-4" /> Add Task
             </button>
           </div>
 
-          {/* Validation Alert */}
           {inputError && (
-            <div className="flex items-center gap-2 text-rose-600 text-xs font-bold animate-fadeIn">
-              <AlertCircle className="w-4 h-4" />
-              <span>Please type a milestone description before clicking Add Milestone!</span>
+            <div className="flex items-center gap-1.5 text-rose-600 text-xs">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>Please enter a milestone description before adding.</span>
             </div>
           )}
 
           {/* Preset Suggested Quick-Add Chips */}
-          <div className="pt-2">
-            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block mb-2">
-              Suggested Quick Milestones (1-Click Add):
+          <div className="pt-1">
+            <span className="text-[11px] font-medium text-zinc-400 block mb-1.5">
+              Quick Suggestions:
             </span>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {PRESET_MILESTONES.map((preset) => {
                 const isAdded = tasks.some((t) => t.title.toLowerCase() === preset.title.toLowerCase());
                 return (
@@ -601,10 +800,10 @@ function EventWorkspaceContent() {
                     key={preset.title}
                     disabled={isAdded}
                     onClick={() => addPresetMilestone(preset)}
-                    className={`text-[11px] font-semibold px-3 py-1 rounded-lg border transition-all ${
+                    className={`text-[11px] font-medium px-2.5 py-1 rounded-md border transition-all cursor-pointer ${
                       isAdded
-                        ? 'bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed opacity-60'
-                        : 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 hover:border-rose-300'
+                        ? 'bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed opacity-50'
+                        : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50'
                     }`}
                   >
                     {isAdded ? `✓ ${preset.title}` : `+ ${preset.title}`}
@@ -616,51 +815,45 @@ function EventWorkspaceContent() {
         </form>
 
         {/* Tasks List */}
-        <div className="space-y-2 pt-2">
-          {tasks.length === 0 ? (
-            <div className="p-8 text-center border-2 border-dashed border-zinc-200 rounded-2xl text-xs text-zinc-400 font-medium">
-              No milestones created yet. Add one above or click a suggested quick milestone!
-            </div>
-          ) : (
-            tasks.map((task) => (
-              <div
-                key={task.id}
-                onClick={() => toggleTask(task.id)}
-                className={`p-3.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all group ${
-                  task.completed
-                    ? 'bg-zinc-50 border-zinc-200 text-zinc-400'
-                    : 'bg-white border-zinc-200 text-zinc-900 hover:border-rose-500 shadow-sm'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`w-4 h-4 rounded-full flex items-center justify-center transition-colors ${
-                      task.completed ? 'bg-rose-600 text-white' : 'border-2 border-zinc-300'
-                    }`}
-                  >
-                    {task.completed && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                  </span>
-                  <span className={`text-xs font-semibold ${task.completed ? 'line-through text-zinc-400' : ''}`}>
-                    {task.title}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] bg-zinc-100 text-zinc-600 px-2.5 py-0.5 rounded-md font-bold">
-                    {task.category}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => deleteTask(task.id, e)}
-                    title="Delete milestone"
-                    className="p-1 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+        <div className="space-y-1.5 pt-1">
+          {tasks.map((task) => (
+            <div
+              key={task.id}
+              onClick={() => toggleTask(task.id)}
+              className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all group ${
+                task.completed
+                  ? 'bg-zinc-50/60 border-zinc-200/60 text-zinc-400'
+                  : 'bg-white border-zinc-200/80 text-zinc-900 hover:border-zinc-300 shadow-2xs'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <span
+                  className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
+                    task.completed ? 'bg-zinc-900 text-white' : 'border border-zinc-300'
+                  }`}
+                >
+                  {task.completed && <Check className="w-3 h-3 stroke-[3]" />}
+                </span>
+                <span className={`text-xs font-medium ${task.completed ? 'line-through text-zinc-400' : ''}`}>
+                  {task.title}
+                </span>
               </div>
-            ))
-          )}
+
+              <div className="flex items-center gap-2.5">
+                <span className="text-[10px] bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded font-medium">
+                  {task.category}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => deleteTask(task.id, e)}
+                  title="Delete milestone"
+                  className="p-1 rounded text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

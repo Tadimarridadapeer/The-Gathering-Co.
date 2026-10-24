@@ -23,7 +23,7 @@ async function bootstrap() {
   );
 
   const config = new DocumentBuilder()
-    .setTitle('PlanMyEvent API Engine')
+    .setTitle('The Gathering Co. API Engine')
     .setDescription('Production Event Marketplace API Engine for Anantapur & Multi-City Expansion')
     .setVersion('1.0')
     .addBearerAuth()
@@ -34,7 +34,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 4000;
   await app.listen(port);
-  console.log(`PlanMyEvent API Server running at http://localhost:${port}`);
+  console.log(`The Gathering Co. API Server running at http://localhost:${port}`);
   console.log(`Swagger Documentation available at http://localhost:${port}/api/docs`);
 }
 

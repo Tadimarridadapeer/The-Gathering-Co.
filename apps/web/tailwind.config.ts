@@ -24,7 +24,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        serif: ['Georgia', 'Cambria', 'serif'],
+        newsreader: ['var(--font-newsreader)', 'Newsreader', 'Georgia', 'serif'],
+        serif: ['var(--font-newsreader)', 'Newsreader', 'Georgia', 'Cambria', 'serif'],
         sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       boxShadow: {

@@ -1,6 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer utilities {
+  .font-newsreader-36pt {
+    font-family: var(--font-newsreader), 'Newsreader', Georgia, serif;
+    font-optical-sizing: auto;
+    font-variation-settings: 'opsz' 36;
+  }
+}
 
 @layer base {
   body {

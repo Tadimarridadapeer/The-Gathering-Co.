@@ -1,15 +1,20 @@
 import React from 'react';
 import Link from 'next/link';
 import { VendorCard } from '@/components/ui/VendorCard';
+import { LocalExpansionCard } from '@/components/ui/LocalExpansionCard';
+import { SERVICE_LOCATIONS } from '@/lib/available-locations';
+import { getVendorsByCity } from '@/lib/anantapur-vendors';
+import { MapPin } from 'lucide-react';
 
 async function getVendors(searchParams: { [key: string]: string | undefined }) {
+  const city = searchParams.city || 'Anantapur';
   const category = searchParams.category || '';
   const sortBy = searchParams.sortBy || 'recommended';
   const verifiedOnly = searchParams.verifiedOnly === 'true';
 
   try {
     const query = new URLSearchParams({
-      city: 'Anantapur',
+      city,
       ...(category && { category }),
       ...(sortBy && { sortBy }),
       ...(verifiedOnly && { verifiedOnly: 'true' }),
@@ -24,88 +29,7 @@ async function getVendors(searchParams: { [key: string]: string | undefined }) {
     }
   } catch (e) {}
 
-  const allVendors = [
-    {
-      id: 'v1',
-      businessName: 'Royal Grand Convention Hall',
-      slug: 'royal-grand-convention-hall-anantapur',
-      categoryName: 'Venues',
-      categorySlug: 'venues',
-      city: 'Anantapur',
-      address: 'Subash Road, Anantapur',
-      startingPrice: 120000,
-      rating: 4.8,
-      reviewCount: 42,
-      verified: true,
-      featured: true,
-      shortDescription: 'Premium AC Convention Center with 1000+ guest capacity on Subash Road, Anantapur.',
-      coverImage: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800',
-    },
-    {
-      id: 'v2',
-      businessName: 'Rayalaseema Elite Catering',
-      slug: 'rayalaseema-elite-catering-anantapur',
-      categoryName: 'Caterers',
-      categorySlug: 'caterers',
-      city: 'Anantapur',
-      address: 'Kamala Nagar, Anantapur',
-      startingPrice: 350,
-      rating: 4.9,
-      reviewCount: 56,
-      verified: true,
-      featured: true,
-      shortDescription: 'Authentic Rayalaseema banana leaf feasts & multi-cuisine buffets in Anantapur.',
-      coverImage: 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&q=80&w=800',
-    },
-    {
-      id: 'v3',
-      businessName: 'Sri Krishna Floral & Mandap Decorators',
-      slug: 'sri-krishna-decorators-anantapur',
-      categoryName: 'Decorators',
-      categorySlug: 'decorators',
-      city: 'Anantapur',
-      address: 'RTC Bus Stand Road, Anantapur',
-      startingPrice: 45000,
-      rating: 4.7,
-      reviewCount: 38,
-      verified: true,
-      featured: true,
-      shortDescription: 'Bespoke Telugu mandap setups, floral arches & grand stage backdrops.',
-      coverImage: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=800',
-    },
-    {
-      id: 'v4',
-      businessName: 'Sri Valli Candid Wedding Photography',
-      slug: 'sri-valli-photography-anantapur',
-      categoryName: 'Photographers',
-      categorySlug: 'photographers',
-      city: 'Anantapur',
-      address: 'Bellary Road, Anantapur',
-      startingPrice: 65000,
-      rating: 4.9,
-      reviewCount: 64,
-      verified: true,
-      featured: true,
-      shortDescription: 'Candid wedding stories, 4K cinematic films & drone coverage across Rayalaseema.',
-      coverImage: 'https://images.unsplash.com/photo-1537633552985-df8429e8048b?auto=format&fit=crop&q=80&w=800',
-    },
-    {
-      id: 'v5',
-      businessName: 'Ananya Bridal Studio & Makeup',
-      slug: 'ananya-bridal-studio-anantapur',
-      categoryName: 'Makeup Artists',
-      categorySlug: 'makeup-artists',
-      city: 'Anantapur',
-      address: 'Gulzarpet, Anantapur',
-      startingPrice: 18000,
-      rating: 4.8,
-      reviewCount: 29,
-      verified: true,
-      featured: false,
-      shortDescription: 'HD & Airbrush bridal makeup specialist with traditional saree draping.',
-      coverImage: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&q=80&w=800',
-    },
-  ];
+  const allVendors = getVendorsByCity(city);
 
   if (category) {
     return allVendors.filter((v) => v.categorySlug === category || v.categoryName?.toLowerCase() === category.toLowerCase());
@@ -119,6 +43,7 @@ export default async function VendorsPage({
   searchParams: Promise<{ [key: string]: string | undefined }>;
 }) {
   const resolvedParams = await searchParams;
+  const city = resolvedParams.city || 'Anantapur';
   const vendors = await getVendors(resolvedParams);
   const activeCategory = resolvedParams.category || '';
 
@@ -126,9 +51,15 @@ export default async function VendorsPage({
     { slug: '', label: 'All Categories' },
     { slug: 'venues', label: 'Venues' },
     { slug: 'photographers', label: 'Photographers' },
-    { slug: 'decorators', label: 'Decorators' },
     { slug: 'caterers', label: 'Caterers' },
     { slug: 'makeup-artists', label: 'Makeup Artists' },
+    { slug: 'decorators', label: 'Decorators' },
+    { slug: 'event-planners', label: 'Event Planners' },
+    { slug: 'mehendi-artists', label: 'Mehendi' },
+    { slug: 'djs', label: 'DJs & Sound' },
+    { slug: 'invitation-designers', label: 'Invitations' },
+    { slug: 'return-gifts', label: 'Return Gifts' },
+    { slug: 'wedding-cars', label: 'Wedding Cars' },
   ];
 
   return (
@@ -136,15 +67,52 @@ export default async function VendorsPage({
       
       {/* Header */}
       <div className="space-y-2">
-        <div className="text-xs font-bold text-rose-600 uppercase tracking-widest">
-          Anantapur Vendor Marketplace
+        <div className="text-xs font-bold text-rose-600 uppercase tracking-widest flex items-center gap-1.5">
+          <MapPin className="w-3.5 h-3.5" />
+          <span>{city} Vendor Marketplace</span>
         </div>
         <h1 className="font-serif font-bold text-3xl sm:text-4xl text-zinc-950">
-          Discover Verified Event Vendors
+          Discover Verified Event Vendors {city ? `in ${city}` : ''}
         </h1>
         <p className="text-xs sm:text-sm text-zinc-500 max-w-2xl">
-          Browse verified function halls, caterers, mandap decorators, and photographers in Anantapur.
+          Browse verified function halls, caterers, mandap decorators, and photographers in {city}.
         </p>
+      </div>
+
+      {/* Available Locations Switcher Strip */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-xs">
+        <span className="font-bold text-zinc-700 flex items-center gap-1.5">
+          <MapPin className="w-3.5 h-3.5 text-rose-600" />
+          Available Locations:
+        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {SERVICE_LOCATIONS.map((loc) => {
+            const isSelected = city.toLowerCase() === loc.city.toLowerCase();
+            const isActive = loc.status === 'ACTIVE';
+            return (
+              <Link
+                key={loc.city}
+                href={`/vendors?city=${encodeURIComponent(loc.city)}${activeCategory ? `&category=${activeCategory}` : ''}`}
+                className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                  isSelected
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : isActive
+                    ? 'bg-white hover:bg-rose-50 text-zinc-900 border border-zinc-200'
+                    : 'bg-zinc-200/60 hover:bg-zinc-200 text-zinc-600'
+                }`}
+              >
+                <span>{loc.city}</span>
+                <span
+                  className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                    isSelected ? 'bg-rose-700 text-white' : isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-zinc-100 text-zinc-500'
+                  }`}
+                >
+                  {isActive ? 'Live' : 'Expanding'}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       {/* Category Pills & Sorting Bar */}
@@ -157,7 +125,7 @@ export default async function VendorsPage({
             return (
               <Link
                 key={c.slug}
-                href={c.slug ? `/vendors?category=${c.slug}` : '/vendors'}
+                href={c.slug ? `/vendors?city=${encodeURIComponent(city)}&category=${c.slug}` : `/vendors?city=${encodeURIComponent(city)}`}
                 className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                   isActive
                     ? 'bg-zinc-950 text-white'
@@ -184,7 +152,7 @@ export default async function VendorsPage({
 
       </div>
 
-      {/* Vendors Grid */}
+      {/* Vendors Grid or Expansion State */}
       {vendors.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {vendors.map((vendor: any) => (
@@ -192,15 +160,7 @@ export default async function VendorsPage({
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-3xl p-12 text-center border border-zinc-200 space-y-4">
-          <h3 className="font-serif font-bold text-xl text-zinc-950">No vendors found</h3>
-          <Link
-            href="/vendors"
-            className="inline-block px-5 py-2.5 rounded-xl bg-zinc-950 text-white text-xs font-bold"
-          >
-            View All Vendors
-          </Link>
-        </div>
+        <LocalExpansionCard city={city} />
       )}
 
     </div>

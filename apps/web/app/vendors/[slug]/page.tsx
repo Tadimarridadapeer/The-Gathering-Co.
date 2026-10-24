@@ -2,7 +2,8 @@ import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Star, ShieldCheck, MapPin, CheckCircle2 } from 'lucide-react';
+import { Star, ShieldCheck, MapPin, CheckCircle2, Phone } from 'lucide-react';
+import { ALL_LOCAL_VENDORS } from '@/lib/anantapur-vendors';
 
 async function getVendorBySlug(slug: string) {
   try {
@@ -42,31 +43,60 @@ async function getVendorBySlug(slug: string) {
     },
   };
 
-  return (
-    vendorsMap[slug] || {
-      id: 'v-default',
-      businessName: slug.replace(/-/g, ' ').toUpperCase(),
-      slug,
-      categoryName: 'Event Vendor',
-      city: 'Anantapur',
+  if (vendorsMap[slug]) return vendorsMap[slug];
+
+  const localMatch = ALL_LOCAL_VENDORS.find((v) => v.slug === slug);
+  if (localMatch) {
+    return {
+      id: localMatch.id,
+      businessName: localMatch.businessName,
+      slug: localMatch.slug,
+      categoryName: localMatch.categoryName,
+      city: localMatch.city,
       state: 'Andhra Pradesh',
-      address: 'Anantapur City, AP',
-      startingPrice: 45000,
-      rating: 4.8,
-      reviewCount: 30,
+      address: localMatch.address,
+      phone: localMatch.phone,
+      startingPrice: localMatch.startingPrice,
+      rating: localMatch.rating,
+      reviewCount: localMatch.reviewCount,
       verified: true,
       verifiedLevel: 'VERIFIED',
-      shortDescription: 'Verified event business serving Anantapur celebrations.',
-      description: 'Professional event service provider offering end-to-end management, competitive pricing, and high customer satisfaction across Rayalaseema.',
-      coverImage: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=1200',
+      shortDescription: localMatch.shortDescription,
+      description: `${localMatch.businessName} is a top-rated, verified ${localMatch.categoryName.toLowerCase()} partner in ${localMatch.city}. Known for dependable execution, transparent pricing, and stellar event delivery across Rayalaseema.`,
+      coverImage: localMatch.coverImage || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=1200',
       packages: [
-        { id: 'p1', name: 'Standard Service Package', price: 45000, duration: '1 Event', deliverables: 'Complete basic service deliverable setup' },
+        { id: 'p1', name: 'Standard Service Package', price: localMatch.startingPrice, duration: '1 Day Event', deliverables: 'Complete basic deliverable setup, professional staff & on-ground execution' },
+        { id: 'p2', name: 'Grand Celebration Package', price: Math.round(localMatch.startingPrice * 1.6), duration: '2 Days Event', deliverables: 'Premium coverage, backup resources, dedicated coordinator & priority service' },
       ],
       reviews: [
-        { id: 'r1', reviewerName: 'Kalyan Kumar', rating: 5, reviewText: 'Great service quality in Anantapur!' },
+        { id: 'r1', reviewerName: 'Verified Client', rating: localMatch.rating, reviewText: `Booked through The Gathering Co. for our family event in ${localMatch.city}. Smooth coordination and great punctuality!` },
       ],
-    }
-  );
+    };
+  }
+
+  return {
+    id: 'v-default',
+    businessName: slug.replace(/-/g, ' ').toUpperCase(),
+    slug,
+    categoryName: 'Event Vendor',
+    city: 'Anantapur',
+    state: 'Andhra Pradesh',
+    address: 'Anantapur City, AP',
+    startingPrice: 45000,
+    rating: 4.8,
+    reviewCount: 30,
+    verified: true,
+    verifiedLevel: 'VERIFIED',
+    shortDescription: 'Verified event business serving celebrations.',
+    description: 'Professional event service provider offering end-to-end management, competitive pricing, and high customer satisfaction across Rayalaseema.',
+    coverImage: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=1200',
+    packages: [
+      { id: 'p1', name: 'Standard Service Package', price: 45000, duration: '1 Event', deliverables: 'Complete basic service deliverable setup' },
+    ],
+    reviews: [
+      { id: 'r1', reviewerName: 'Kalyan Kumar', rating: 5, reviewText: 'Great service quality!' },
+    ],
+  };
 }
 
 export default async function VendorDetailPage({
@@ -115,13 +145,25 @@ export default async function VendorDetailPage({
             <h1 className="font-serif font-bold text-3xl sm:text-4xl text-zinc-950">
               {vendor.businessName}
             </h1>
-            <div className="flex items-center gap-3 text-xs font-semibold text-zinc-600">
+            <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-zinc-600">
               <span className="flex items-center gap-1 text-zinc-950 font-bold">
                 <Star className="w-4 h-4 fill-rose-600 text-rose-600" />
-                {vendor.rating.toFixed(1)} ({vendor.reviewCount} Reviews)
+                {vendor.rating ? Number(vendor.rating).toFixed(1) : '5.0'} ({vendor.reviewCount} Reviews)
               </span>
               <span>&bull;</span>
-              <span>{vendor.address}</span>
+              <span className="flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-zinc-400" />
+                {vendor.address}
+              </span>
+              {vendor.phone && (
+                <>
+                  <span>&bull;</span>
+                  <span className="flex items-center gap-1 text-emerald-700 font-mono">
+                    <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                    {vendor.phone}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -177,7 +219,7 @@ export default async function VendorDetailPage({
             <div className="flex items-center justify-between">
               <h2 className="font-serif font-bold text-2xl text-zinc-950">Customer Reviews</h2>
               <span className="text-xs font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-full">
-                ★ {vendor.rating.toFixed(1)} Rating
+                ★ {(Number(vendor.rating) || 5.0).toFixed(1)} Rating
               </span>
             </div>
 
@@ -210,6 +252,19 @@ export default async function VendorDetailPage({
                 Submit your event details. Our local Anantapur team will check vendor availability and send pricing directly to you.
               </p>
             </div>
+
+            {vendor.phone && (
+              <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between">
+                <span className="text-xs text-zinc-400">Direct Contact:</span>
+                <a
+                  href={`tel:${vendor.phone.replace(/\s+/g, '')}`}
+                  className="font-mono text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  {vendor.phone}
+                </a>
+              </div>
+            )}
 
             <Link
               href="/vendors"

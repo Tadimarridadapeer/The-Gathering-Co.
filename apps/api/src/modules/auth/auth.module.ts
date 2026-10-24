@@ -9,7 +9,7 @@ import { PrismaService } from '../../prisma.service';
   imports: [
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'planmyevent-secret-key-2026',
+      secret: process.env.JWT_SECRET || 'the-gathering-co-secret-key-2026',
       signOptions: { expiresIn: '7d' },
     }),
   ],

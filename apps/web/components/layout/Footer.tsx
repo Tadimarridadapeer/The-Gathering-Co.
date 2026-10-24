@@ -10,20 +10,16 @@ export const Footer = () => {
           
           {/* Brand Info */}
           <div className="space-y-4 md:col-span-1">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-rose-600 flex items-center justify-center text-white font-serif font-bold text-lg">
-                P
-              </div>
-              <span className="font-serif font-bold text-xl text-white tracking-tight">
-                PlanMyEvent
-              </span>
-            </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Anantapur&apos;s local event-planning marketplace. Discover, compare, shortlist, and book verified venues, caterers, decorators, and photographers in Rayalaseema.
+            <Link href="/" className="inline-flex flex-col font-newsreader-36pt text-white leading-[0.9] tracking-[-0.02em] select-none">
+              <span className="text-[14px] font-normal tracking-tight text-zinc-300">The</span>
+              <span className="text-[24px] font-normal tracking-tight text-white">Gathering Co.</span>
+            </Link>
+            <p className="text-xs text-zinc-400 leading-relaxed pt-1">
+              India&apos;s premier managed event-planning platform by The Gathering Co. Discover, compare, shortlist, and book 100% verified venues, caterers, decorators, and photographers with zero hidden markups.
             </p>
             <div className="flex items-center gap-2 text-xs text-rose-500 font-medium pt-2">
               <MapPin className="w-4 h-4 text-rose-600" />
-              <span>Anantapur, Andhra Pradesh</span>
+              <span>India &bull; Live in Anantapur & Kadapa</span>
             </div>
           </div>
 
@@ -56,7 +52,7 @@ export const Footer = () => {
 
           {/* Categories */}
           <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-white uppercase tracking-wider">Top Categories in Anantapur</h4>
+            <h4 className="text-xs font-semibold text-white uppercase tracking-wider">Top Categories in Rayalaseema</h4>
             <ul className="space-y-2 text-xs text-zinc-400">
               <li>
                 <Link href="/vendors?category=venues" className="hover:text-white transition-colors">
@@ -89,7 +85,7 @@ export const Footer = () => {
                 100% Manually Verified
               </div>
               <p className="text-[11px] text-zinc-400 leading-snug">
-                Every vendor in Anantapur is personally onboarded and verified by our internal curation team.
+                Every vendor across our live hubs is personally inspected in person and verified by our on-ground curation team.
               </p>
             </div>
           </div>
@@ -98,13 +94,9 @@ export const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 gap-4">
-          <p>© 2026 PlanMyEvent Technologies India. All rights reserved.</p>
+          <p>© 2026 The Gathering Co. Technologies India. All rights reserved.</p>
           <div className="flex items-center gap-6">
-            <Link href="/admin" className="hover:text-zinc-300">
-              Admin Portal
-            </Link>
-            <span>&bull;</span>
-            <span className="text-zinc-400">Anantapur, Andhra Pradesh</span>
+            <span className="text-zinc-400">Made for Celebrations Across India</span>
           </div>
         </div>
       </div>

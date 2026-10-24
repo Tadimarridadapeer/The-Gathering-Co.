@@ -32,7 +32,7 @@ async function bootstrap() {
     );
 
     const config = new DocumentBuilder()
-      .setTitle('PlanMyEvent API Engine')
+      .setTitle('The Gathering Co. API Engine')
       .setDescription('Production Event Marketplace API Engine for Anantapur & Multi-City Expansion')
       .setVersion('1.0')
       .addBearerAuth()
